@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,24 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    with gzip.open(image_filename, "rb") as img_file:
+      magic_num, img_num, row_num, col_num = struct.unpack(">4i", img_file.read(16))
+      assert(magic_num == 2051)
+      pixel_num = row_num * col_num
+      num_examples = img_num
+      image_list = []
+      for _ in range(img_num):
+          image_array = np.array(struct.unpack(f"{pixel_num}B", img_file.read(pixel_num)), dtype=np.float32)
+          image_list.append(image_array)
+      X = np.vstack(image_list)
+      X -= np.min(X)
+      X /= np.max(X)
+    with gzip.open(label_filename, "rb") as lb_file:
+      magic_num, lb_num = struct.unpack(">2i", lb_file.read(8))
+      assert(magic_num == 2049)
+      y = np.array(struct.unpack(f"{lb_num}B", lb_file.read()), dtype=np.uint8)
+
+    return X, y
     ### END YOUR CODE
 
 
@@ -68,7 +85,10 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    m = y.size
+    r1 = np.sum(np.log(np.sum(np.exp(Z), axis=1)))
+    r2 = np.sum(Z[np.arange(m), y])
+    return (r1 - r2) / m
     ### END YOUR CODE
 
 
@@ -91,7 +111,18 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    times = (y.size + batch - 1) // batch
+    for i in range(times):
+      xx = X[i * batch : (i + 1) * batch]
+      yy = y[i * batch : (i + 1) * batch]
+      Z = np.exp(xx @ theta)
+      Z = Z / np.sum(Z, axis=1, keepdims=True)
+      Y = np.zeros((batch, y.max() + 1))
+      Y[np.arange(batch), yy] = 1
+      grad = xx.T @ (Z - Y) / batch
+      assert(grad.shape == theta.shape)
+      theta -= lr * grad
+
     ### END YOUR CODE
 
 
@@ -118,7 +149,24 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    times = (y.size + batch - 1) // batch
+    for i in range(times):
+      xx = X[i * batch : (i + 1) * batch]
+      yy = y[i * batch : (i + 1) * batch]
+      Z1 = xx @ W1
+      Z1[Z1 < 0] = 0
+      G2 = np.exp(Z1 @ W2)
+      G2 = G2 / np.sum(G2, axis=1, keepdims=True)
+      Iy = np.zeros((batch, y.max() + 1))
+      Iy[np.arange(batch), yy] = 1
+      G2 -= Iy
+      G1 = np.zeros_like(Z1)
+      G1[Z1 > 0] = 1
+      G1 = G1 * (G2 @ W2.T)
+      grad1 = xx.T @ G1 / batch
+      grad2 = Z1.T @ G2 / batch
+      W1 -= lr * grad1
+      W2 -= lr * grad2
     ### END YOUR CODE
 
 
@@ -171,7 +219,7 @@ if __name__ == "__main__":
                              "data/t10k-labels-idx1-ubyte.gz")
 
     print("Training softmax regression")
-    train_softmax(X_tr, y_tr, X_te, y_te, epochs=10, lr = 0.1)
+    train_softmax(X_tr, y_tr, X_te, y_te, epochs=10, lr = 0.2)
 
-    print("\nTraining two layer neural network w/ 100 hidden units")
-    train_nn(X_tr, y_tr, X_te, y_te, hidden_dim=100, epochs=20, lr = 0.2)
+    print("\nTraining two layer neural network w/ 400 hidden units")
+    train_nn(X_tr, y_tr, X_te, y_te, hidden_dim=400, epochs=20, lr = 0.2)
